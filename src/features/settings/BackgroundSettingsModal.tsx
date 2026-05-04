@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Modal, message } from "antd";
 import { useAppDispatch } from "../../hooks";
 import { updateBackground } from "./settingsSlice";
