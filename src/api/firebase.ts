@@ -1,9 +1,8 @@
-// Импортируем необходимые функции из SDK Firebase
-import { initializeApp } from "firebase/app"; // Для инициализации Firebase приложения
-import { getAuth } from "firebase/auth"; // Для работы с аутентификацией
-import { getFirestore } from "firebase/firestore"; // Для работы с Firestore (базой данных)
+import { initializeApp } from "firebase/app"; 
+import { getAuth } from "firebase/auth"; 
+import { getFirestore } from "firebase/firestore"; 
+import { getStorage } from "firebase/storage";
 
-// Конфигурация Firebase приложения, берём значения из переменных окружения
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY, // API ключ проекта Firebase
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, // Домен для аутентификации
@@ -14,9 +13,8 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? undefined, // ID для аналитики (может быть undefined)
 };
 
-// Инициализация Firebase приложения с конфигурацией
 const app = initializeApp(firebaseConfig);
 
-// Получаем экземпляры сервисов Firebase для дальнейшего использования в приложении
-export const auth = getAuth(app); // Экземпляр аутентификации
-export const db = getFirestore(app); // Экземпляр базы данных Firestore
+export const auth = getAuth(app); 
+export const db = getFirestore(app);
+export const storage = getStorage(app);

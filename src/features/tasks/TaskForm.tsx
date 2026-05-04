@@ -1,136 +1,141 @@
-import React, { useEffect } from "react";
-import { Modal, Form, Input, Select, Button, message } from "antd";
-import { useAppDispatch, useAppSelector } from "../../hooks";
-import { addTask, updateTask } from "./tasksSlice";
+import React, { useEffect, useState } from "react";
+import { Modal, Form, Input, Button, Radio, Space, message } from "antd";
+import { useAppDispatch } from "../../hooks";
+import { addTask, updateTask, deleteTask } from "./tasksSlice";
 
-// Интерфейс пропсов для компонента TaskForm
+const priorityOptions = [
+  { value: "Low", color: "green", label: "Не горит" },
+  { value: "Medium", color: "gold", label: "Стоило бы начать" },
+  { value: "High", color: "red", label: "Горит!" },
+];
+
 interface TaskFormProps {
-  open: boolean; // флаг, открыта ли модальная форма
-  onClose: () => void; // функция закрытия модалки
-  userId: string; // id пользователя для новой задачи
-  taskToEdit?: { // если передан — форма для редактирования
-    id: string;
-    title: string;
-    description?: string;
-    priority: "low" | "medium" | "high";
-  };
+  open: boolean;
+  onClose: () => void;
+  userId: string;
+  editingTask?: any | null;
 }
 
-const TaskForm: React.FC<TaskFormProps> = ({ open, onClose, taskToEdit }) => {
-  const dispatch = useAppDispatch(); // подключение к Redux для диспатча действий
-  const user = useAppSelector((s) => s.auth.user); // получение текущего пользователя из состояния
-  const [form] = Form.useForm(); // создание экземпляра формы Ant Design
+const TaskForm: React.FC<TaskFormProps> = ({
+  open,
+  onClose,
+  userId,
+  editingTask,
+}) => {
+  const [form] = Form.useForm();
+  const dispatch = useAppDispatch();
+  const [loading, setLoading] = useState(false);
 
-  // useEffect отвечает за инициализацию полей формы при открытии модалки
   useEffect(() => {
-    if (!open) {
-      // если форма закрыта — сбрасываем поля
-      form.resetFields();
-      return;
-    }
-
-    if (taskToEdit) {
-      // если редактируем задачу — заполняем поля текущими данными
+    if (open && editingTask) {
       form.setFieldsValue({
-        title: taskToEdit.title,
-        description: taskToEdit.description,
-        priority: taskToEdit.priority,
+        title: editingTask.title,
+        description: editingTask.description,
+        priority: editingTask.priority,
       });
     } else {
-      // если создаём новую задачу — очищаем форму
       form.resetFields();
+      form.setFieldsValue({ priority: "Low" });
     }
-  }, [taskToEdit, form, open]);
+  }, [open, editingTask, form]);
 
-  // Функция отправки формы
-  const handleSubmit = async () => {
+  const handleSubmit = async (values: any) => {
+    setLoading(true);
     try {
-      // валидируем все поля формы
-      const values = await form.validateFields();
+      // Гарантируем, что description не undefined
+      const taskData = {
+        title: values.title,
+        description: values.description || "",
+        priority: values.priority,
+      };
 
-      if (!user) return; // если нет пользователя — выходим
-
-      if (taskToEdit) {
-        // редактирование существующей задачи
+      if (editingTask) {
         await dispatch(
           updateTask({
-            id: taskToEdit.id,
-            updates: {
-              title: values.title,
-              description: values.description,
-              priority: values.priority,
-            },
-          })
-        ).unwrap(); // unwrap позволяет отловить ошибку через try/catch
-
-        message.success("Задача успешно отредактирована"); // уведомление об успехе
-      } else {
-        // создание новой задачи
-        await dispatch(
-          addTask({
-            title: values.title,
-            description: values.description,
-            priority: values.priority,
-            userId: user.uid,
+            id: editingTask.id,
+            ...taskData,
           })
         ).unwrap();
-
-        message.success("Задача успешно создана"); // уведомление об успехе
+        message.success("Задача обновлена");
+      } else {
+        await dispatch(
+          addTask({
+            userId,
+            ...taskData,
+            status: "Planned",
+          })
+        ).unwrap();
+        message.success("Задача создана");
       }
+      onClose();
+    } catch (error) {
+      console.error("Ошибка сохранения:", error);
+      message.error("Ошибка сохранения");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      form.resetFields(); // очищаем форму
-      onClose(); // закрываем модалку
-    } catch (error: any) {
-      // обработка ошибок: отображаем сообщение пользователю
-      message.error(error?.message || "Не удалось сохранить задачу");
+  const handleDelete = async () => {
+    if (!editingTask) return;
+    setLoading(true);
+    try {
+      await dispatch(deleteTask(editingTask.id)).unwrap();
+      message.success("Задача удалена");
+      onClose();
+    } catch (error) {
+      console.error("Ошибка удаления:", error);
+      message.error("Ошибка удаления");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <Modal
-      title={taskToEdit ? "Редактировать задачу" : "Новая задача"} // заголовок зависит от режима
-      open={open} // состояние открытия модалки
-      onCancel={onClose} // закрытие при клике на крестик
-      destroyOnHidden // очищает содержимое при закрытии
-      forceRender // принудительно рендерит содержимое, чтобы message и useForm корректно работали
-      footer={[
-        <Button key="cancel" onClick={onClose}>
-          Отмена
-        </Button>,
-        <Button key="ok" type="primary" onClick={handleSubmit}>
-          {taskToEdit ? "Сохранить" : "Добавить"}
-        </Button>,
-      ]}
+      title={editingTask ? "Редактировать задачу" : "Новая задача"}
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      destroyOnHidden
     >
-      <Form form={form} layout="vertical">
-        {/* Поле для ввода названия задачи */}
+      <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Form.Item
           name="title"
           label="Название"
           rules={[{ required: true, message: "Введите название" }]}
         >
-          <Input />
+          <Input placeholder="Название задачи" />
         </Form.Item>
 
-        {/* Поле для ввода описания задачи */}
         <Form.Item name="description" label="Описание">
-          <Input.TextArea rows={3} />
+          <Input.TextArea rows={3} placeholder="Описание (необязательно)" />
         </Form.Item>
 
-        {/* Выбор приоритета задачи */}
-        <Form.Item
-          name="priority"
-          label="Приоритет"
-          initialValue="medium"
-          rules={[{ required: true }]}
-        >
-          <Select
-            options={[
-              { value: "low", label: "Низкий" },
-              { value: "medium", label: "Средний" },
-              { value: "high", label: "Высокий" },
-            ]}
-          />
+        <Form.Item name="priority" label="Приоритет">
+          <Radio.Group>
+            <Space direction="horizontal">
+              {priorityOptions.map((opt) => (
+                <Radio key={opt.value} value={opt.value}>
+                  <span style={{ color: opt.color }}>⬤</span> {opt.label}
+                </Radio>
+              ))}
+            </Space>
+          </Radio.Group>
+        </Form.Item>
+
+        <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
+          {editingTask && (
+            <Button danger onClick={handleDelete} loading={loading} style={{ marginRight: 8 }}>
+              Удалить
+            </Button>
+          )}
+          <Button onClick={onClose} style={{ marginRight: 8 }}>
+            Отмена
+          </Button>
+          <Button type="primary" htmlType="submit" loading={loading}>
+            {editingTask ? "Сохранить" : "Создать"}
+          </Button>
         </Form.Item>
       </Form>
     </Modal>

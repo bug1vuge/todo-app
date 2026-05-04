@@ -1,65 +1,99 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import { auth } from "../../api/firebase";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  updateEmail,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from "firebase/auth";
 
-// Тип состояния пользователя: либо объект с uid/email, либо null (не авторизован)
 type UserState = { uid: string; email?: string } | null;
 
-// Тип состояния аутентификации
 interface AuthState {
-  user: UserState; // текущий пользователь
-  status: "idle" | "loading" | "succeeded" | "failed"; // статус запроса
-  error?: string | null; // ошибка, если есть
-  initialized: boolean; // флаг, что auth инициализирован
+  user: UserState;
+  status: "idle" | "loading" | "succeeded" | "failed";
+  error?: string | null;
+  initialized: boolean;
 }
 
-// Начальное состояние
 const initialState: AuthState = {
   user: null,
   status: "idle",
   error: null,
-  initialized: false
+  initialized: false,
 };
 
-// -------------------- Асинхронные операции --------------------
-
-// Регистрация нового пользователя
+// -------------------- Существующие thunks --------------------
 export const register = createAsyncThunk<
-  { uid: string; email?: string }, // возвращаемый тип при успехе
-  { email: string; password: string }, // аргументы функции
-  { rejectValue: string } // тип отклоненного значения
->(
-  "auth/register",
-  async ({ email, password }, { rejectWithValue }) => {
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      return { uid: cred.user.uid, email: cred.user.email ?? undefined };
-    } catch (e: any) {
-      return rejectWithValue(e.message ?? "Ошибка при регистрации");
-    }
+  { uid: string; email?: string },
+  { email: string; password: string },
+  { rejectValue: string }
+>("auth/register", async ({ email, password }, { rejectWithValue }) => {
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    return { uid: cred.user.uid, email: cred.user.email ?? undefined };
+  } catch (e: any) {
+    return rejectWithValue(e.message ?? "Ошибка при регистрации");
   }
-);
+});
 
-// Вход пользователя
 export const login = createAsyncThunk<
   { uid: string; email?: string },
   { email: string; password: string },
   { rejectValue: string }
->(
-  "auth/login",
-  async ({ email, password }, { rejectWithValue }) => {
-    try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      return { uid: cred.user.uid, email: cred.user.email ?? undefined };
-    } catch (e: any) {
-      return rejectWithValue(e.message ?? "Ошибка при входе");
-    }
+>("auth/login", async ({ email, password }, { rejectWithValue }) => {
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    return { uid: cred.user.uid, email: cred.user.email ?? undefined };
+  } catch (e: any) {
+    return rejectWithValue(e.message ?? "Ошибка при входе");
   }
-);
+});
 
-// Выход пользователя
 export const logout = createAsyncThunk("auth/logout", async () => {
   await signOut(auth);
+});
+
+// -------------------- Новые thunks для смены email/пароля --------------------
+export const updateUserEmail = createAsyncThunk<
+  { email: string },
+  { newEmail: string; password: string },
+  { rejectValue: string }
+>("auth/updateUserEmail", async ({ newEmail, password }, { rejectWithValue }) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Пользователь не авторизован");
+    if (!user.email) throw new Error("Email не найден");
+
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+    await updateEmail(user, newEmail);
+
+    return { email: newEmail };
+  } catch (e: any) {
+    return rejectWithValue(e.message ?? "Ошибка при смене email");
+  }
+});
+
+export const updateUserPassword = createAsyncThunk<
+  void,
+  { currentPassword: string; newPassword: string },
+  { rejectValue: string }
+>("auth/updateUserPassword", async ({ currentPassword, newPassword }, { rejectWithValue }) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Пользователь не авторизован");
+    if (!user.email) throw new Error("Email не найден");
+
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, newPassword);
+  } catch (e: any) {
+    return rejectWithValue(e.message ?? "Ошибка при смене пароля");
+  }
 });
 
 // -------------------- Slice --------------------
@@ -67,32 +101,27 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    // Устанавливает пользователя вручную (например, после проверки токена)
     setUser(state, action: PayloadAction<UserState>) {
       state.user = action.payload;
       state.status = "succeeded";
       state.error = null;
       state.initialized = true;
     },
-    // Очищает пользователя (например, после выхода)
     clearUser(state) {
       state.user = null;
-      state.status = "succeeded"; 
+      state.status = "succeeded";
       state.error = null;
-      state.initialized = true; 
+      state.initialized = true;
     },
-    // Устанавливает статус загрузки
     setLoading(state) {
       state.status = "loading";
     },
-    // Помечает auth как инициализированный
     setInitialized(state) {
       state.initialized = true;
     },
   },
   extraReducers: (builder) => {
     builder
-      // -------------------- Регистрация --------------------
       .addCase(register.pending, (s) => {
         s.status = "loading";
         s.error = null;
@@ -105,7 +134,6 @@ const authSlice = createSlice({
         s.status = "failed";
         s.error = a.payload as string;
       })
-      // -------------------- Вход --------------------
       .addCase(login.pending, (s) => {
         s.status = "loading";
         s.error = null;
@@ -118,16 +146,23 @@ const authSlice = createSlice({
         s.status = "failed";
         s.error = a.payload as string;
       })
-      // -------------------- Выход --------------------
       .addCase(logout.fulfilled, (s) => {
         s.user = null;
         s.status = "idle";
+      })
+      .addCase(updateUserEmail.fulfilled, (s, a) => {
+        if (s.user) {
+          s.user.email = a.payload.email;
+        }
+      })
+      .addCase(updateUserEmail.rejected, (_state, action) => {
+        console.error("Ошибка смены email:", action.payload);
+      })
+      .addCase(updateUserPassword.rejected, (_state, action) => {
+        console.error("Ошибка смены пароля:", action.payload);
       });
   },
 });
 
-// Экспорт действий
 export const { setUser, clearUser, setLoading } = authSlice.actions;
-
-// Экспорт редьюсера
 export default authSlice.reducer;

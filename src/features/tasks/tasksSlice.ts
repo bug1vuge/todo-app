@@ -1,170 +1,170 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
-import { db } from "../../api/firebase";
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  doc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  type DocumentData,
-} from "firebase/firestore";
+  fetchTasksFromFirestore,
+  addTaskToFirestore,
+  updateTaskInFirestore,
+  deleteTaskFromFirestore,
+  updateTaskStatusInFirestore,
+} from "../../api/taskService";
 
-// Тип приоритета задачи
-export type Priority = "low" | "medium" | "high";
-
-// Интерфейс задачи
 export interface Task {
-  id: string; // ID документа в Firestore
-  title: string; // Название задачи
-  description?: string; // Описание задачи
-  completed: boolean; // Статус выполнения
-  priority: Priority; // Приоритет
-  createdAt?: any; // Дата создания
-  updatedAt?: any; // Дата последнего обновления
-  userId: string; // ID пользователя, которому принадлежит задача
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  status: "Planned" | "InProgress" | "Done";
+  priority: "Low" | "Medium" | "High";
+  dueDate?: any;
+  createdAt: any;
+  updatedAt: any;
 }
 
-// Состояние Redux для задач
 interface TasksState {
-  items: Task[]; // массив задач
-  status: "idle" | "loading" | "succeeded" | "failed"; // статус асинхронных операций
-  error?: string | null; // ошибка при операциях
+  tasks: Task[];
+  status: "idle" | "loading" | "succeeded" | "failed";
+  error: string | null;
 }
 
 const initialState: TasksState = {
-  items: [],
+  tasks: [],
   status: "idle",
   error: null,
 };
 
-// ----------------- Асинхронные действия -----------------
-
-// Получение задач пользователя
-export const fetchTasks = createAsyncThunk<Task[], string, { rejectValue: string }>(
+export const fetchTasks = createAsyncThunk(
   "tasks/fetchTasks",
-  async (userId, { rejectWithValue }) => {
+  async (userId: string) => {
+    console.log("🚀 fetchTasks thunk started for userId:", userId);
     try {
-      const q = query(
-        collection(db, "tasks"),
-        where("userId", "==", userId),
-      );
-      const snap = await getDocs(q);
-      // Преобразуем документы Firestore в массив Task
-      const tasks: Task[] = snap.docs.map(
-        (d) => ({ id: d.id, ...(d.data() as DocumentData) }) as Task
-      );
+      const tasks = await fetchTasksFromFirestore(userId);
+      console.log("✅ fetchTasks thunk completed, tasks count:", tasks.length);
       return tasks;
-    } catch (e: any) {
-      return rejectWithValue(e.message ?? "Ошибка загрузки задач");
+    } catch (error) {
+      console.error("❌ fetchTasks thunk caught error:", error);
+      throw error;
     }
   }
 );
 
-// Добавление новой задачи
-export const addTask = createAsyncThunk<
-  Task,
-  { title: string; description?: string; priority?: Priority; userId: string },
-  { rejectValue: string }
->(
+export const addTask = createAsyncThunk(
   "tasks/addTask",
-  async ({ title, description, priority = "medium", userId }, { rejectWithValue }) => {
+  async (taskData: Omit<Task, "id" | "createdAt" | "updatedAt">) => {
+    console.log("➕ addTask thunk started with data:", taskData);
     try {
-      const ref = await addDoc(collection(db, "tasks"), {
-        title,
-        description: description ?? "",
-        completed: false,
-        priority,
-        userId,
-        createdAt: Date.now(),
-        updatedAt: serverTimestamp(),
-      });
-      return {
-        id: ref.id,
-        title,
-        description: description ?? "",
-        completed: false,
-        priority,
-        userId,
-        createdAt: Date.now(),
-      } as Task;
-    } catch (e: any) {
-      return rejectWithValue(e.message ?? "Ошибка добавления задачи");
+      const newTask = await addTaskToFirestore(taskData);
+      console.log("✅ addTask thunk completed, new task:", newTask);
+      return newTask;
+    } catch (error) {
+      console.error("❌ addTask thunk caught error:", error);
+      throw error;
     }
   }
 );
 
-// Обновление задачи
-export const updateTask = createAsyncThunk<Task, { id: string; updates: Partial<Task> }, { rejectValue: string }>(
+export const updateTask = createAsyncThunk(
   "tasks/updateTask",
-  async ({ id, updates }, { rejectWithValue }) => {
+  async ({ id, ...updates }: Partial<Task> & { id: string }) => {
+    console.log("✏️ updateTask thunk started for id:", id, "updates:", updates);
     try {
-      const ref = doc(db, "tasks", id);
-      await updateDoc(ref, { ...updates, updatedAt: serverTimestamp() });
-      return { id, ...(updates as any) } as Task;
-    } catch (e: any) {
-      return rejectWithValue(e.message ?? "Ошибка обновления задачи");
+      const updated = await updateTaskInFirestore(id, updates);
+      console.log("✅ updateTask thunk completed, updated task:", updated);
+      return updated;
+    } catch (error) {
+      console.error("❌ updateTask thunk caught error:", error);
+      throw error;
     }
   }
 );
 
-// Удаление задачи
-export const removeTask = createAsyncThunk<string, string, { rejectValue: string }>(
-  "tasks/removeTask",
-  async (id, { rejectWithValue }) => {
+export const deleteTask = createAsyncThunk(
+  "tasks/deleteTask",
+  async (id: string) => {
+    console.log("🗑️ deleteTask thunk started for id:", id);
     try {
-      await deleteDoc(doc(db, "tasks", id));
+      await deleteTaskFromFirestore(id);
+      console.log("✅ deleteTask thunk completed");
       return id;
-    } catch (e: any) {
-      return rejectWithValue(e.message ?? "Ошибка удаления задачи");
+    } catch (error) {
+      console.error("❌ deleteTask thunk caught error:", error);
+      throw error;
     }
   }
 );
 
-// ----------------- Slice -----------------
+export const moveTask = createAsyncThunk(
+  "tasks/moveTask",
+  async ({ taskId, newStatus }: { taskId: string; newStatus: string }) => {
+    console.log("🔄 moveTask thunk started for taskId:", taskId, "newStatus:", newStatus);
+    try {
+      await updateTaskStatusInFirestore(taskId, newStatus);
+      console.log("✅ moveTask thunk completed");
+      return { taskId, newStatus };
+    } catch (error) {
+      console.error("❌ moveTask thunk caught error:", error);
+      throw error;
+    }
+  }
+);
+
 const tasksSlice = createSlice({
   name: "tasks",
   initialState,
   reducers: {
-    // Очистка всех задач
-    clearTasks(state) {
-      state.items = [];
+    clearTasks: (state) => {
+      state.tasks = [];
       state.status = "idle";
-      state.error = null;
     },
   },
-  extraReducers(builder) {
+  extraReducers: (builder) => {
     builder
-      // fetchTasks
-      .addCase(fetchTasks.pending, (s) => {
-        s.status = "loading"; // загрузка
+      .addCase(fetchTasks.pending, (state) => {
+        state.status = "loading";
+        console.log("⏳ fetchTasks pending");
       })
-      .addCase(fetchTasks.fulfilled, (s, a: PayloadAction<Task[]>) => {
-        s.status = "succeeded"; // успешно загружено
-        s.items = a.payload; // сохраняем задачи
+      .addCase(fetchTasks.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        state.tasks = action.payload;
+        console.log("✅ fetchTasks fulfilled, tasks count:", action.payload.length);
       })
-      .addCase(fetchTasks.rejected, (s, a) => {
-        s.status = "failed"; // ошибка загрузки
-        s.error = a.payload as string;
+      .addCase(fetchTasks.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.error.message || "Ошибка загрузки";
+        console.error("❌ fetchTasks rejected:", action.error);
       })
-      // addTask
-      .addCase(addTask.fulfilled, (s, a) => {
-        s.items.unshift(a.payload); // добавляем новую задачу в начало списка
+      .addCase(addTask.fulfilled, (state, action) => {
+        state.tasks.push(action.payload);
+        console.log("✅ addTask fulfilled, new task:", action.payload);
       })
-      // updateTask
-      .addCase(updateTask.fulfilled, (s, a) => {
-        // обновляем существующую задачу
-        s.items = s.items.map((t) =>
-          t.id === a.payload.id ? { ...t, ...(a.payload as any) } : t
-        );
+      .addCase(addTask.rejected, (_state, action) => {
+        console.error("❌ addTask rejected:", action.error);
       })
-      // removeTask
-      .addCase(removeTask.fulfilled, (s, a) => {
-        // удаляем задачу из массива
-        s.items = s.items.filter((t) => t.id !== a.payload);
+      .addCase(updateTask.fulfilled, (state, action) => {
+        const task = state.tasks.find((t) => t.id === action.payload.id);
+        if (task) {
+          Object.assign(task, action.payload);
+        }
+        console.log("✅ updateTask fulfilled, updated task:", action.payload);
+      })
+      .addCase(updateTask.rejected, (_state, action) => {
+        console.error("❌ updateTask rejected:", action.error);
+      })
+      .addCase(deleteTask.fulfilled, (state, action) => {
+        state.tasks = state.tasks.filter((t) => t.id !== action.payload);
+        console.log("✅ deleteTask fulfilled, removed id:", action.payload);
+      })
+      .addCase(deleteTask.rejected, (_state, action) => {
+        console.error("❌ deleteTask rejected:", action.error);
+      })
+      .addCase(moveTask.fulfilled, (state, action) => {
+        const { taskId, newStatus } = action.payload;
+        const task = state.tasks.find((t) => t.id === taskId);
+        if (task) {
+          task.status = newStatus as Task["status"];
+        }
+        console.log("✅ moveTask fulfilled:", action.payload);
+      })
+      .addCase(moveTask.rejected, (_state, action) => {
+        console.error("❌ moveTask rejected:", action.error);
       });
   },
 });

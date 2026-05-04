@@ -3,66 +3,67 @@ import { Form, Input, Button, Card, message } from "antd";
 import { useNavigate, Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { login } from "../features/auth/authSlice";
+import "./Auth.css"; 
 
 const Login: React.FC = () => {
-  const dispatch = useAppDispatch(); // Redux dispatch для вызова Thunk действий
-  const status = useAppSelector((s) => s.auth.status); // Статус авторизации (idle/loading/succeeded/failed)
-  const navigate = useNavigate(); // Хук для навигации после успешного входа
+  const dispatch = useAppDispatch();
+  const status = useAppSelector((s) => s.auth.status);
+  const navigate = useNavigate();
 
-  // Функция обработки отправки формы
   const onFinish = async (values: { email: string; password: string }) => {
-    const res = await dispatch(login(values)); // Диспатчим Thunk login
+    const res = await dispatch(login(values));
 
-    // Проверяем результат через тип действия
-    // TS игнорируется, так как тип payload в Thunk может быть string | undefined
-    // @ts-ignore
+    // @ts-ignore (упрощённо для учебного проекта)
     if (res.type === "auth/login/fulfilled") {
-      message.success("Вы вошли"); // Всплывающее уведомление о успешном входе
-      navigate("/"); // Перенаправление на главную страницу
+      message.success("Вы успешно вошли");
+      navigate("/");
     } else {
       // @ts-ignore
-      message.error(res.payload ?? "Ошибка входа"); // Всплывающее уведомление при ошибке
+      message.error(res.payload ?? "Ошибка входа");
     }
   };
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", paddingTop: 80 }}>
-      <Card title="Вход">
-        <Form layout="vertical" onFinish={onFinish} style={{ width: 300 }}>
-          {/* Поле для ввода email */}
-          <Form.Item
-            name="email"
-            rules={[{ required: true, message: "Введите email" }]}
-          >
-            <Input placeholder="Email" />
-          </Form.Item>
-
-          {/* Поле для ввода пароля */}
-          <Form.Item
-            name="password"
-            rules={[{ required: true, message: "Введите пароль" }]}
-          >
-            <Input.Password placeholder="Пароль" />
-          </Form.Item>
-
-          {/* Кнопка входа */}
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={status === "loading"} // Показ спиннера при загрузке
-              block
+    <div className="login-container">
+      <div className="login-card-wrapper">
+        <Card className="login-card">
+          <div className="login-header">
+            <h2>Добро пожаловать!</h2>
+            <p>Войдите, чтобы продолжить</p>
+          </div>
+          <Form layout="vertical" onFinish={onFinish}>
+            <Form.Item
+              name="email"
+              rules={[{ required: true, message: "Введите email" }]}
             >
-              Войти
-            </Button>
-          </Form.Item>
+              <Input placeholder="Email" size="large" autoComplete="off"/>
+            </Form.Item>
 
-          {/* Ссылка на страницу регистрации */}
-          <Form.Item>
-            Нет аккаунта? <Link to="/register">Регистрация</Link>
-          </Form.Item>
-        </Form>
-      </Card>
+            <Form.Item
+              name="password"
+              rules={[{ required: true, message: "Введите пароль" }]}
+            >
+              <Input.Password placeholder="Пароль" autoComplete="off" size="large" />
+            </Form.Item>
+
+            <Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={status === "loading"}
+                block
+                size="large"
+              >
+                Войти
+              </Button>
+            </Form.Item>
+
+            <Form.Item style={{ textAlign: "center", marginBottom: 0 }}>
+              Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+            </Form.Item>
+          </Form>
+        </Card>
+      </div>
     </div>
   );
 };
