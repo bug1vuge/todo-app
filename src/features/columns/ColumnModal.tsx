@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Input, message, Button, Space, Popconfirm } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { Modal, Input, message, Button, Space } from 'antd';
+import { DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useAppDispatch } from '../../hooks';
 import { deleteColumnWithTasks } from './columnsSlice';
+
+const { confirm } = Modal;
 
 interface ColumnModalProps {
   open: boolean;
@@ -42,15 +44,26 @@ const ColumnModal: React.FC<ColumnModalProps> = ({
     onClose();
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!columnId || !userId) return;
-    try {
-      await dispatch(deleteColumnWithTasks({ columnId, userId })).unwrap();
-      message.success('Колонка удалена, задачи перемещены в "Сделать"');
-      onClose();
-    } catch {
-      message.error('Ошибка при удалении колонки');
-    }
+    confirm({
+      title: 'Удалить колонку?',
+      icon: <ExclamationCircleOutlined />,
+      content: 'Все задачи из этой колонки будут перемещены в колонку «Сделать». Отменить нельзя.',
+      okText: 'Да',
+      cancelText: 'Нет',
+      width: 520, // сделаем шире (было по умолчанию ~416)
+      zIndex: 2000, // поднимем над модалкой редактирования
+      onOk: async () => {
+        try {
+          await dispatch(deleteColumnWithTasks({ columnId, userId })).unwrap();
+          message.success('Колонка удалена, задачи перемещены в "Сделать"');
+          onClose();
+        } catch {
+          message.error('Ошибка при удалении колонки');
+        }
+      },
+    });
   };
 
   const titleText = mode === 'create' ? 'Создание колонки' : 'Редактирование колонки';
@@ -67,15 +80,9 @@ const ColumnModal: React.FC<ColumnModalProps> = ({
       footer={(
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {mode === 'edit' && (
-            <Popconfirm
-              title="Удалить колонку?"
-              description="Все задачи из этой колонки будут перемещены в колонку «Сделать». Отменить нельзя."
-              onConfirm={handleDelete}
-              okText="Да"
-              cancelText="Нет"
-            >
-              <Button danger icon={<DeleteOutlined />}>Удалить колонку</Button>
-            </Popconfirm>
+            <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
+              Удалить колонку
+            </Button>
           )}
           <Space>
             <Button onClick={onClose}>Отмена</Button>
