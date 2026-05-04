@@ -25,7 +25,7 @@ const SortableTaskCard: React.FC<SortableTaskCardProps> = ({ task, onClick }) =>
     opacity: isDragging ? 0.5 : 1,
     cursor: isDragging ? "grabbing" : "grab",
     zIndex: isDragging ? 999 : "auto",
-    position: isDragging ? "relative" : "static",
+    position: "relative", // всегда relative, чтобы transform работал корректно
     boxShadow: isDragging ? "0 5px 15px rgba(0,0,0,0.3)" : "none",
   };
 

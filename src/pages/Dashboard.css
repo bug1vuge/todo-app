@@ -60,3 +60,40 @@
   }
 }
 
+
+/* Стилизация скроллбара для блока с колонками */
+.kanban-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.4) rgba(255,255,255,0.1);
+}
+
+.kanban-scrollbar::-webkit-scrollbar {
+  height: 8px;
+}
+
+.kanban-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+}
+
+.kanban-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.4);
+  border-radius: 4px;
+}
+
+.kanban-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.6);
+}
+
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.dashboard-container .ant-layout {
+  flex: 1;
+}
+.dashboard-container .ant-layout-content {
+  display: flex;
+  flex-direction: column;
+}

@@ -9,25 +9,10 @@ import type { BackgroundSettings } from "../../api/settingsService";
 const { Dragger } = Upload;
 
 const presetColors = [
-  "#0b0b2b",
-  "#1a1a2e",
-  "#16213e",
-  "#0f3460",
-  "#1e3c72",
-  "#2a5298",
-  "#4b6cb7",
-  "#182848",
-  "#141e30",
-  "#243b55",
-  "#3a1c71",
-  "#d76d77",
-  "#ffaf7b",
-  "#159957",
-  "#155799",
-  "#000428",
-  "#004e92",
-  "#360033",
-  "#0b8793",
+  "#0b0b2b", "#1a1a2e", "#16213e", "#0f3460", "#1e3c72",
+  "#2a5298", "#4b6cb7", "#182848", "#141e30", "#243b55",
+  "#3a1c71", "#d76d77", "#ffaf7b", "#159957", "#155799",
+  "#000428", "#004e92", "#360033", "#0b8793",
 ];
 
 interface BackgroundSettingsModalProps {
@@ -47,10 +32,14 @@ const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = ({
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  const handleColorSelect = (color: string) => {
-    dispatch(updateBackground({ userId, background: { type: "color", value: color } }));
-    message.success("Фон обновлён");
-    onClose();
+  const handleColorSelect = async (color: string) => {
+    try {
+      await dispatch(updateBackground({ userId, background: { type: "color", value: color } })).unwrap();
+      message.success("Фон обновлён");
+      onClose();
+    } catch {
+      message.error("Ошибка обновления фона");
+    }
   };
 
   const handleUpload = async (file: File) => {
@@ -61,11 +50,12 @@ const BackgroundSettingsModal: React.FC<BackgroundSettingsModalProps> = ({
       setFileList([]);
       onClose();
     } catch (error) {
-      message.error("Ошибка загрузки изображения");
+      message.error("Ошибка загрузки изображения. Проверьте подключение и права доступа.");
+      console.error("Upload error:", error);
     } finally {
       setUploading(false);
     }
-    return false;
+    return false; // предотвращаем автоматическую загрузку
   };
 
   const uploadProps = {

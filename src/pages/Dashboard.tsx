@@ -1,154 +1,17 @@
-// import React, { useEffect, useState } from "react";
-// import { Layout, Button, message } from "antd";
-// import { UserOutlined } from "@ant-design/icons";
-// import { useAppDispatch, useAppSelector } from "../hooks";
-// import { clearTasks, fetchTasks, moveTask } from "../features/tasks/tasksSlice";
-// import { fetchSettings } from "../features/settings/settingsSlice";
-// import KanbanBoard from "../features/tasks/KanbanBoard";
-// import TaskForm from "../features/tasks/TaskForm";
-// import BackgroundSettingsModal from "../features/settings/BackgroundSettingsModal";
-// import { logout } from "../features/auth/authSlice";
-// import { type DragEndEvent } from "@dnd-kit/core";
-// import "./Dashboard.css";
-
-// const { Header, Content } = Layout;
-
-// const Dashboard: React.FC = () => {
-//   const dispatch = useAppDispatch();
-//   const { user, initialized } = useAppSelector((s) => s.auth);
-//   const { tasks, status: tasksStatus } = useAppSelector((s) => s.tasks);
-//   const { settings, status: settingsStatus } = useAppSelector((s) => s.settings);
-//   const [openTaskForm, setOpenTaskForm] = useState(false);
-//   const [openBackgroundModal, setOpenBackgroundModal] = useState(false);
-//   const [editingTask, setEditingTask] = useState<any | null>(null);
-
-//   useEffect(() => {
-//     if (initialized && user) {
-//       if (tasksStatus === "idle") {
-//         dispatch(fetchTasks(user.uid));
-//       }
-//       if (settingsStatus === "idle") {
-//         dispatch(fetchSettings(user.uid));
-//       }
-//     }
-//   }, [dispatch, user, initialized, tasksStatus, settingsStatus]);
-
-//   const handleLogout = async () => {
-//     await dispatch(logout());
-//     dispatch(clearTasks());
-//     message.info("Вы вышли");
-//   };
-
-//   const handleTaskClick = (task: any) => {
-//     setEditingTask(task);
-//     setOpenTaskForm(true);
-//   };
-
-//   const handleDragEnd = (event: DragEndEvent) => {
-//     const { active, over } = event;
-//     if (!over) return;
-
-//     const taskId = active.id as string;
-//     const newStatus = over.id as string;
-
-//     const task = tasks.find((t) => t.id === taskId);
-//     if (task && task.status !== newStatus) {
-//       dispatch(moveTask({ taskId, newStatus }));
-//     }
-//   };
-
-//   const handleCloseTaskForm = () => {
-//     setOpenTaskForm(false);
-//     setEditingTask(null);
-//   };
-
-//   // Определяем класс контейнера: если есть пользовательский фон – скрываем градиент
-//   const containerClass = settings?.background ? "dashboard-container custom-background" : "dashboard-container";
-
-//   // Стили для пользовательского фона
-//   const backgroundStyle = settings?.background?.type === "color"
-//     ? { backgroundColor: settings.background.value }
-//     : settings?.background?.type === "image"
-//     ? { backgroundImage: `url(${settings.background.value})`, backgroundSize: "cover", backgroundPosition: "center" }
-//     : {};
-
-//   return (
-//     <div className={containerClass} style={backgroundStyle}>
-//       <Layout style={{ minHeight: "100vh", background: "transparent" }}>
-//         <Header
-//           style={{
-//             display: "flex",
-//             justifyContent: "space-between",
-//             alignItems: "center",
-//             background: "rgba(0,0,0,0.3)",
-//             backdropFilter: "blur(8px)",
-//           }}
-//         >
-//           <div style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>
-//             Todo App
-//           </div>
-//           <div>
-//             <Button
-//               type="primary"
-//               onClick={() => setOpenBackgroundModal(true)}
-//               style={{ marginRight: 8 }}
-//             >
-//               Изменить фон
-//             </Button>
-//             <Button
-//               type="primary"
-//               onClick={() => setOpenTaskForm(true)}
-//               style={{ marginRight: 8 }}
-//             >
-//               Добавить задачу
-//             </Button>
-//             <Button
-//               type="text"
-//               icon={<UserOutlined />}
-//               onClick={handleLogout} // пока просто выход, потом сделаем профиль
-//               style={{ color: "white" }}
-//             />
-//           </div>
-//         </Header>
-//         <Content style={{ padding: 24 }}>
-//           <KanbanBoard
-//             tasks={tasks}
-//             onTaskClick={handleTaskClick}
-//             onDragEnd={handleDragEnd}
-//           />
-//         </Content>
-//       </Layout>
-//       <TaskForm
-//         open={openTaskForm}
-//         onClose={handleCloseTaskForm}
-//         userId={user?.uid ?? ""}
-//         editingTask={editingTask}
-//       />
-//       <BackgroundSettingsModal
-//         open={openBackgroundModal}
-//         onClose={() => setOpenBackgroundModal(false)}
-//         userId={user?.uid ?? ""}
-//         currentBackground={settings?.background}
-//       />
-//     </div>
-//   );
-// };
-
-// export default Dashboard;
-
-
-import React, { useEffect, useState } from "react";
-import { Layout, Button } from "antd";
-import { UserOutlined } from "@ant-design/icons";
-import { useAppDispatch, useAppSelector } from "../hooks";
-import { fetchTasks, moveTask } from "../features/tasks/tasksSlice";
-import { fetchSettings } from "../features/settings/settingsSlice";
-import KanbanBoard from "../features/tasks/KanbanBoard";
-import TaskForm from "../features/tasks/TaskForm";
-import BackgroundSettingsModal from "../features/settings/BackgroundSettingsModal";
-import UserProfileDrawer from "../features/auth/UserProfileDrawer";
-import { type DragEndEvent } from "@dnd-kit/core";
-import "./Dashboard.css";
+import React, { useEffect, useState } from 'react';
+import { Layout, Button, message, Spin } from 'antd';
+import { UserOutlined } from '@ant-design/icons';
+import { useAppDispatch, useAppSelector } from '../hooks';
+import { fetchTasks, moveTask } from '../features/tasks/tasksSlice';
+import { fetchSettings } from '../features/settings/settingsSlice';
+import { loadColumns } from '../features/columns/columnsSlice';
+import KanbanBoard from '../features/tasks/KanbanBoard';
+import TaskForm from '../features/tasks/TaskForm';
+import BackgroundSettingsModal from '../features/settings/BackgroundSettingsModal';
+import UserProfileDrawer from '../features/auth/UserProfileDrawer';
+import { type DragEndEvent } from '@dnd-kit/core';
+import type { Task } from '../features/tasks/tasksSlice';
+import './Dashboard.css';
 
 const { Header, Content } = Layout;
 
@@ -157,23 +20,36 @@ const Dashboard: React.FC = () => {
   const { user, initialized } = useAppSelector((s) => s.auth);
   const { tasks, status: tasksStatus } = useAppSelector((s) => s.tasks);
   const { settings, status: settingsStatus } = useAppSelector((s) => s.settings);
+  const { columns, loading: columnsLoading } = useAppSelector((s) => s.columns);
+
   const [openTaskForm, setOpenTaskForm] = useState(false);
   const [openBackgroundModal, setOpenBackgroundModal] = useState(false);
   const [openProfileDrawer, setOpenProfileDrawer] = useState(false);
-  const [editingTask, setEditingTask] = useState<any | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
+  // Загружаем колонки, задачи и настройки только один раз после инициализации авторизации
   useEffect(() => {
     if (initialized && user) {
-      if (tasksStatus === "idle") {
+      if (columnsLoading === false && columns.length === 0) {
+        // загружаем колонки, если они ещё не загружены и массив пуст (не было дефолтных)
+        dispatch(loadColumns(user.uid));
+      }
+      if (tasksStatus === 'idle') {
         dispatch(fetchTasks(user.uid));
       }
-      if (settingsStatus === "idle") {
+      if (settingsStatus === 'idle') {
         dispatch(fetchSettings(user.uid));
       }
     }
-  }, [dispatch, user, initialized, tasksStatus, settingsStatus]);
+  }, [dispatch, user, initialized, columnsLoading, columns.length, tasksStatus, settingsStatus]);
 
-  const handleTaskClick = (task: any) => {
+  useEffect(() => {
+    if (tasksStatus === 'failed') {
+      message.error('Не удалось загрузить задачи. Попробуйте обновить страницу.');
+    }
+  }, [tasksStatus]);
+
+  const handleTaskClick = (task: Task) => {
     setEditingTask(task);
     setOpenTaskForm(true);
   };
@@ -196,27 +72,51 @@ const Dashboard: React.FC = () => {
     setEditingTask(null);
   };
 
-  // Определяем класс контейнера и стили фона
-  const containerClass = settings?.background ? "dashboard-container custom-background" : "dashboard-container";
-  const backgroundStyle = settings?.background?.type === "color"
-    ? { backgroundColor: settings.background.value }
-    : settings?.background?.type === "image"
-    ? { backgroundImage: `url(${settings.background.value})`, backgroundSize: "cover", backgroundPosition: "center" }
-    : {};
+  const getBackgroundStyle = () => {
+    if (!settings?.background) return {};
+    if (settings.background.type === 'color') {
+      return { backgroundColor: settings.background.value };
+    }
+    if (settings.background.type === 'image') {
+      return {
+        backgroundImage: `url(${settings.background.value})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      };
+    }
+    return {};
+  };
+
+  const containerStyle = {
+    ...getBackgroundStyle(),
+    minHeight: '100vh',
+  };
+
+  // Показываем спиннер, пока загружаются колонки или задачи (но не включаем индикатор, если уже есть данные)
+  const isLoading = !initialized || columnsLoading || tasksStatus === 'loading';
+
+  if (isLoading) {
+    return (
+      <div className="loading-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" tip="Загрузка колонок и задач..." />
+      </div>
+    );
+  }
 
   return (
-    <div className={containerClass} style={backgroundStyle}>
-      <Layout style={{ minHeight: "100vh", background: "transparent" }}>
+    <div className="dashboard-container" style={containerStyle}>
+      <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
         <Header
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            background: "rgba(0,0,0,0.3)",
-            backdropFilter: "blur(8px)",
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(8px)',
           }}
         >
-          <div style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>
+          <div style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>
             Todo App
           </div>
           <div>
@@ -238,12 +138,13 @@ const Dashboard: React.FC = () => {
               type="text"
               icon={<UserOutlined />}
               onClick={() => setOpenProfileDrawer(true)}
-              style={{ color: "white", marginLeft: 8 }}
+              style={{ color: 'white', marginLeft: 8 }}
             />
           </div>
         </Header>
-        <Content style={{ padding: 24 }}>
+        <Content style={{ padding: 24, height: '100%' }}>
           <KanbanBoard
+            columns={columns}
             tasks={tasks}
             onTaskClick={handleTaskClick}
             onDragEnd={handleDragEnd}
@@ -253,13 +154,13 @@ const Dashboard: React.FC = () => {
       <TaskForm
         open={openTaskForm}
         onClose={handleCloseTaskForm}
-        userId={user?.uid ?? ""}
+        userId={user?.uid ?? ''}
         editingTask={editingTask}
       />
       <BackgroundSettingsModal
         open={openBackgroundModal}
         onClose={() => setOpenBackgroundModal(false)}
-        userId={user?.uid ?? ""}
+        userId={user?.uid ?? ''}
         currentBackground={settings?.background}
       />
       <UserProfileDrawer

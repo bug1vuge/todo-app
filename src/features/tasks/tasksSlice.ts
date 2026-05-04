@@ -12,11 +12,11 @@ export interface Task {
   userId: string;
   title: string;
   description: string;
-  status: "Planned" | "InProgress" | "Done";
+  status: string;
   priority: "Low" | "Medium" | "High";
-  dueDate?: any;
-  createdAt: any;
-  updatedAt: any;
+  dueDate?: Date | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
 }
 
 interface TasksState {
@@ -159,9 +159,8 @@ const tasksSlice = createSlice({
         const { taskId, newStatus } = action.payload;
         const task = state.tasks.find((t) => t.id === taskId);
         if (task) {
-          task.status = newStatus as Task["status"];
+          task.status = newStatus; // теперь не нужно приводить к Task["status"]
         }
-        console.log("✅ moveTask fulfilled:", action.payload);
       })
       .addCase(moveTask.rejected, (_state, action) => {
         console.error("❌ moveTask rejected:", action.error);

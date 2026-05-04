@@ -60,11 +60,20 @@ const settingsSlice = createSlice({
         state.status = "failed";
         state.error = action.error.message || "Ошибка загрузки настроек";
       })
+      // ✅ ИСПРАВЛЕНО: мержим background, а не заменяем весь settings
       .addCase(updateBackground.fulfilled, (state, action) => {
-        state.settings = { background: action.payload };
+        if (state.settings) {
+          state.settings.background = action.payload;
+        } else {
+          state.settings = { background: action.payload };
+        }
       })
       .addCase(uploadImageAndUpdateBackground.fulfilled, (state, action) => {
-        state.settings = { background: action.payload };
+        if (state.settings) {
+          state.settings.background = action.payload;
+        } else {
+          state.settings = { background: action.payload };
+        }
       });
   },
 });

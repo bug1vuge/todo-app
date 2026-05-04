@@ -1,19 +1,21 @@
-import { configureStore } from "@reduxjs/toolkit";
-import authReducer from "../features/auth/authSlice"; 
-import tasksReducer from "../features/tasks/tasksSlice"; 
-import settingsReducer from "../features/settings/settingsSlice";
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from '../features/auth/authSlice';
+import tasksReducer from '../features/tasks/tasksSlice';
+import settingsReducer from '../features/settings/settingsSlice';
+import columnsReducer from '../features/columns/columnsSlice'; // новый импорт
 
 export const store = configureStore({
   reducer: {
-    auth: authReducer,   
-    tasks: tasksReducer, 
+    auth: authReducer,
+    tasks: tasksReducer,
     settings: settingsReducer,
+    columns: columnsReducer, // добавляем
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: false, 
+      serializableCheck: false,
     }),
-  devTools: import.meta.env.DEV, 
+  devTools: import.meta.env.DEV,
 });
 
 export type RootState = ReturnType<typeof store.getState>;

@@ -9,6 +9,7 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 import type { Task } from "../features/tasks/tasksSlice";
 
@@ -17,15 +18,8 @@ const transformTaskData = (doc: any): Task => {
   const data = doc.data();
   const id = doc.id;
 
-  // Определяем статус: если есть поле status, используем его, иначе смотрим completed
-  let status: Task["status"] = "Planned";
-  if (data.status && ["Planned", "InProgress", "Done"].includes(data.status)) {
-    status = data.status;
-  } else if (data.completed === true) {
-    status = "Done";
-  } else if (data.completed === false) {
-    status = "Planned";
-  }
+  // ✅ Статус – любая строка (берём из БД, если нет – "Planned")
+  const status: string = data.status || "Planned";
 
   // Приводим priority к правильному регистру (Low, Medium, High)
   let priority: Task["priority"] = "Medium";
@@ -36,6 +30,13 @@ const transformTaskData = (doc: any): Task => {
     else if (p === "high") priority = "High";
   }
 
+  // ✅ Преобразуем Timestamp в Date (или оставляем null)
+  const convertTimestamp = (value: any): Date | null => {
+    if (value instanceof Timestamp) return value.toDate();
+    if (value instanceof Date) return value;
+    return null;
+  };
+
   return {
     id,
     userId: data.userId || "",
@@ -43,9 +44,9 @@ const transformTaskData = (doc: any): Task => {
     description: data.description || "",
     status,
     priority,
-    dueDate: data.dueDate || null,
-    createdAt: data.createdAt || null,
-    updatedAt: data.updatedAt || null,
+    dueDate: convertTimestamp(data.dueDate),
+    createdAt: convertTimestamp(data.createdAt),
+    updatedAt: convertTimestamp(data.updatedAt),
   } as Task;
 };
 
@@ -54,7 +55,6 @@ export const fetchTasksFromFirestore = async (userId: string): Promise<Task[]> =
   try {
     const tasksRef = collection(db, "tasks");
     const q = query(tasksRef, where("userId", "==", userId));
-    console.log("📥 Executing Firestore query...");
     const querySnapshot = await getDocs(q);
     console.log(`📥 Query successful. Found ${querySnapshot.size} documents.`);
 
@@ -65,7 +65,6 @@ export const fetchTasksFromFirestore = async (userId: string): Promise<Task[]> =
       return task;
     });
 
-    console.log("📦 Returning tasks array:", tasks);
     return tasks;
   } catch (error) {
     console.error("❌ Error in fetchTasksFromFirestore:", error);
@@ -82,17 +81,16 @@ export const addTaskToFirestore = async (taskData: Omit<Task, "id" | "createdAt"
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-    console.log("➕ Adding document with data:", docData);
     const docRef = await addDoc(tasksRef, docData);
     console.log("✅ Document added with ID:", docRef.id);
 
+    // Возвращаем задачу с клиентским Date (для немедленного использования)
     const result = {
       id: docRef.id,
       ...taskData,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    console.log("📦 Returning new task:", result);
     return result;
   } catch (error) {
     console.error("❌ Error in addTaskToFirestore:", error);
@@ -104,11 +102,12 @@ export const updateTaskInFirestore = async (id: string, updates: Partial<Task>) 
   console.log("✏️ updateTaskInFirestore called for id:", id, "updates:", updates);
   try {
     const taskRef = doc(db, "tasks", id);
+    // Убираем поля, которые не нужно отправлять в Firestore (например, даты как Date)
+    const { createdAt, updatedAt, ...cleanUpdates } = updates;
     const updateData = {
-      ...updates,
+      ...cleanUpdates,
       updatedAt: serverTimestamp(),
     };
-    console.log("✏️ Updating with data:", updateData);
     await updateDoc(taskRef, updateData);
     console.log("✅ Document updated successfully");
     return { id, ...updates };

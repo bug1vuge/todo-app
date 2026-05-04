@@ -1,31 +1,26 @@
 import React from "react";
-import { Navigate } from "react-router-dom"; // Для перенаправления на другой маршрут
-import { useAppSelector } from "../hooks"; // Хук для доступа к состоянию Redux
-import "../App.css"; // Подключение стилей
+import { Navigate } from "react-router-dom";
+import { Spin } from "antd"; // добавляем спиннер
+import { useAppSelector } from "../hooks";
+import "../App.css";
 
-// Интерфейс пропсов: ProtectedRoute ожидает дочерние элементы
 interface Props {
   children: React.ReactNode;
 }
 
-// Компонент защищённого маршрута
 const ProtectedRoute: React.FC<Props> = ({ children }) => {
-  // Получаем пользователя и статус инициализации из Redux состояния auth
   const { user, initialized } = useAppSelector((s) => s.auth);
 
-  // Если данные auth ещё не загружены, показываем экран загрузки
   if (!initialized) {
     return (
-      <div className="loader-overlay">
-        <p>Загрузка...</p>
+      <div className="loading-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fff' }}>
+        <Spin size="large" tip="Загрузка..." />
       </div>
     );
   }
 
-  // Если пользователь не авторизован, перенаправляем на страницу входа
   if (!user) return <Navigate to="/login" replace />;
 
-  // Если пользователь авторизован, отображаем дочерние компоненты маршрута
   return <>{children}</>;
 };
 
