@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, } from '@reduxjs/toolkit';
 import { updateTaskStatusInFirestore } from '../../api/taskService';
 import { fetchUserColumns, saveUserColumns } from '../../api/columnsService';
 import type { RootState } from '../../app/store';

@@ -69,7 +69,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
           }}
           className="kanban-scrollbar"
         >
-          {columns.map((col, index) => {
+          {columns.map((col) => {
             const columnTasks = tasks.filter((t) => t.status === col.id);
             return (
               <div
