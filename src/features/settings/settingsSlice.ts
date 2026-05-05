@@ -1,13 +1,12 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
-  fetchUserSettings,
-  updateBackgroundSettings,
-  uploadBackgroundImage,
+  fetchBoardSettings,
+  updateBoardBackgroundSettings,
 } from "../../api/settingsService";
-import type { BackgroundSettings, UserSettings } from "../../api/settingsService";
+import type { BackgroundSettings } from "../../api/settingsService";
 
 interface SettingsState {
-  settings: UserSettings | null;
+  settings: { background?: BackgroundSettings } | null;
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
 }
@@ -20,25 +19,15 @@ const initialState: SettingsState = {
 
 export const fetchSettings = createAsyncThunk(
   "settings/fetchSettings",
-  async (userId: string) => {
-    return await fetchUserSettings(userId);
+  async (boardId: string) => {
+    return await fetchBoardSettings(boardId);
   }
 );
 
 export const updateBackground = createAsyncThunk(
   "settings/updateBackground",
-  async ({ userId, background }: { userId: string; background: BackgroundSettings }) => {
-    await updateBackgroundSettings(userId, background);
-    return background;
-  }
-);
-
-export const uploadImageAndUpdateBackground = createAsyncThunk(
-  "settings/uploadImageAndUpdateBackground",
-  async ({ userId, file }: { userId: string; file: File }) => {
-    const url = await uploadBackgroundImage(userId, file);
-    const background: BackgroundSettings = { type: "image", value: url };
-    await updateBackgroundSettings(userId, background);
+  async ({ boardId, background }: { boardId: string; background: BackgroundSettings }) => {
+    await updateBoardBackgroundSettings(boardId, background);
     return background;
   }
 );
@@ -60,15 +49,7 @@ const settingsSlice = createSlice({
         state.status = "failed";
         state.error = action.error.message || "Ошибка загрузки настроек";
       })
-      // ✅ ИСПРАВЛЕНО: мержим background, а не заменяем весь settings
       .addCase(updateBackground.fulfilled, (state, action) => {
-        if (state.settings) {
-          state.settings.background = action.payload;
-        } else {
-          state.settings = { background: action.payload };
-        }
-      })
-      .addCase(uploadImageAndUpdateBackground.fulfilled, (state, action) => {
         if (state.settings) {
           state.settings.background = action.payload;
         } else {

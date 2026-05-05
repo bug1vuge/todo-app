@@ -1,8 +1,6 @@
 import { db } from "./firebase";
 import {
   collection,
-  query,
-  where,
   getDocs,
   addDoc,
   doc,
@@ -13,133 +11,95 @@ import {
 } from "firebase/firestore";
 import type { Task } from "../features/tasks/tasksSlice";
 
-// Вспомогательная функция для приведения данных задачи к формату Task
-const transformTaskData = (doc: any): Task => {
+const getTasksCollection = (boardId: string) => collection(db, "boards", boardId, "tasks");
+
+const convertTimestamp = (value: any): Date | null => {
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+};
+
+const transformTaskData = (doc: any, boardId: string): Task => {
   const data = doc.data();
-  const id = doc.id;
-
-  // ✅ Статус – любая строка (берём из БД, если нет – "Planned")
-  const status: string = data.status || "Planned";
-
-  // Приводим priority к правильному регистру (Low, Medium, High)
-  let priority: Task["priority"] = "Medium";
-  if (data.priority) {
-    const p = data.priority.toLowerCase();
-    if (p === "low") priority = "Low";
-    else if (p === "medium") priority = "Medium";
-    else if (p === "high") priority = "High";
-  }
-
-  // ✅ Преобразуем Timestamp в Date (или оставляем null)
-  const convertTimestamp = (value: any): Date | null => {
-    if (value instanceof Timestamp) return value.toDate();
-    if (value instanceof Date) return value;
-    return null;
-  };
-
   return {
-    id,
-    userId: data.userId || "",
+    id: doc.id,
+    boardId,
     title: data.title || "Без названия",
     description: data.description || "",
-    status,
-    priority,
+    status: data.status || "Planned",
+    priority: data.priority || "Medium",
     dueDate: convertTimestamp(data.dueDate),
     createdAt: convertTimestamp(data.createdAt),
     updatedAt: convertTimestamp(data.updatedAt),
   } as Task;
 };
 
-export const fetchTasksFromFirestore = async (userId: string): Promise<Task[]> => {
-  console.log("📥 fetchTasksFromFirestore called with userId:", userId);
+export const fetchTasksFromFirestore = async (boardId: string): Promise<Task[]> => {
   try {
-    const tasksRef = collection(db, "tasks");
-    const q = query(tasksRef, where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
-    console.log(`📥 Query successful. Found ${querySnapshot.size} documents.`);
-
-    const tasks = querySnapshot.docs.map((doc) => {
-      console.log("📄 Raw document data:", doc.id, doc.data());
-      const task = transformTaskData(doc);
-      console.log("🔄 Transformed task:", task);
-      return task;
-    });
-
-    return tasks;
+    const tasksRef = getTasksCollection(boardId);
+    const snapshot = await getDocs(tasksRef);
+    return snapshot.docs.map((doc) => transformTaskData(doc, boardId));
   } catch (error) {
-    console.error("❌ Error in fetchTasksFromFirestore:", error);
+    console.error("fetchTasksFromFirestore error:", error);
     throw error;
   }
 };
 
 export const addTaskToFirestore = async (taskData: Omit<Task, "id" | "createdAt" | "updatedAt">) => {
-  console.log("➕ addTaskToFirestore called with data:", taskData);
   try {
-    const tasksRef = collection(db, "tasks");
+    const { boardId, ...data } = taskData;
+    const tasksRef = getTasksCollection(boardId);
     const docData = {
-      ...taskData,
+      ...data,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
     const docRef = await addDoc(tasksRef, docData);
-    console.log("✅ Document added with ID:", docRef.id);
-
-    // Возвращаем задачу с клиентским Date (для немедленного использования)
-    const result = {
+    return {
       id: docRef.id,
-      ...taskData,
+      ...data,
       createdAt: new Date(),
       updatedAt: new Date(),
-    };
-    return result;
+    } as Task;
   } catch (error) {
-    console.error("❌ Error in addTaskToFirestore:", error);
+    console.error("addTaskToFirestore error:", error);
     throw error;
   }
 };
 
 export const updateTaskInFirestore = async (id: string, updates: Partial<Task>) => {
-  console.log("✏️ updateTaskInFirestore called for id:", id, "updates:", updates);
   try {
-    const taskRef = doc(db, "tasks", id);
-    // Убираем поля, которые не нужно отправлять в Firestore (например, даты как Date)
-    const { createdAt, updatedAt, ...cleanUpdates } = updates;
+    const { boardId, ...cleanUpdates } = updates;
+    if (!boardId) throw new Error("boardId is required for update");
+    const taskRef = doc(getTasksCollection(boardId), id);
     const updateData = {
       ...cleanUpdates,
       updatedAt: serverTimestamp(),
     };
     await updateDoc(taskRef, updateData);
-    console.log("✅ Document updated successfully");
-    return { id, ...updates };
+    return { id, ...cleanUpdates };
   } catch (error) {
-    console.error("❌ Error in updateTaskInFirestore:", error);
+    console.error("updateTaskInFirestore error:", error);
     throw error;
   }
 };
 
-export const updateTaskStatusInFirestore = async (taskId: string, status: string) => {
-  console.log("🔄 updateTaskStatusInFirestore called for taskId:", taskId, "new status:", status);
+export const updateTaskStatusInFirestore = async (taskId: string, status: string, boardId: string) => {
   try {
-    const taskRef = doc(db, "tasks", taskId);
-    await updateDoc(taskRef, {
-      status,
-      updatedAt: serverTimestamp(),
-    });
-    console.log("✅ Status updated successfully");
+    const taskRef = doc(getTasksCollection(boardId), taskId);
+    await updateDoc(taskRef, { status, updatedAt: serverTimestamp() });
   } catch (error) {
-    console.error("❌ Error in updateTaskStatusInFirestore:", error);
+    console.error("updateTaskStatusInFirestore error:", error);
     throw error;
   }
 };
 
-export const deleteTaskFromFirestore = async (id: string) => {
-  console.log("🗑️ deleteTaskFromFirestore called for id:", id);
+export const deleteTaskFromFirestore = async (id: string, boardId: string) => {
   try {
-    const taskRef = doc(db, "tasks", id);
+    const taskRef = doc(getTasksCollection(boardId), id);
     await deleteDoc(taskRef);
-    console.log("✅ Document deleted successfully");
   } catch (error) {
-    console.error("❌ Error in deleteTaskFromFirestore:", error);
+    console.error("deleteTaskFromFirestore error:", error);
     throw error;
   }
 };

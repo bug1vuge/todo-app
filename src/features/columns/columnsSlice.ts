@@ -1,6 +1,12 @@
-import { createSlice, createAsyncThunk, } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { updateTaskStatusInFirestore } from '../../api/taskService';
-import { fetchUserColumns, saveUserColumns } from '../../api/columnsService';
+import {
+  fetchBoardColumns,
+  saveBoardColumns,
+  addColumnToBoard,
+  updateColumnTitleInBoard,
+  deleteColumnFromBoard,
+} from '../../api/columnsService';
 import type { RootState } from '../../app/store';
 
 export interface Column {
@@ -14,87 +20,68 @@ interface ColumnsState {
   error: string | null;
 }
 
+const DEFAULT_COLUMNS: Column[] = [
+  { id: 'Planned', title: 'Сделать' },
+  { id: 'InProgress', title: 'В процессе' },
+  { id: 'Done', title: 'Сделано' },
+];
+
 const initialState: ColumnsState = {
   columns: [],
   loading: false,
   error: null,
 };
 
-// Загрузка колонок
 export const loadColumns = createAsyncThunk(
   'columns/load',
-  async (userId: string) => {
-    return await fetchUserColumns(userId);
+  async ({ boardId }: { boardId: string }) => {
+    let cols = await fetchBoardColumns(boardId);
+    if (!cols.length) {
+      cols = DEFAULT_COLUMNS;
+      await saveBoardColumns(boardId, cols);
+    }
+    return cols;
   }
 );
 
-// Добавление колонки (сразу сохраняем)
 export const addColumnAsync = createAsyncThunk<
-  Column, // возвращаем добавленную колонку
-  { userId: string; title: string },
-  { state: RootState; rejectValue: string }
->('columns/addColumnAsync', async ({ userId, title }, { getState, rejectWithValue }) => {
-  try {
-    const newId = `col_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    const newColumn: Column = { id: newId, title: title.trim() };
-    const currentColumns = getState().columns.columns;
-    const updatedColumns = [...currentColumns, newColumn];
-    await saveUserColumns(userId, updatedColumns);
-    return newColumn;
-  } catch (error) {
-    return rejectWithValue('Ошибка при добавлении колонки');
-  }
+  Column,
+  { boardId: string; title: string },
+  { state: RootState }
+>('columns/addColumnAsync', async ({ boardId, title }) => {
+  const newId = `col_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const newColumn: Column = { id: newId, title: title.trim() };
+  await addColumnToBoard(boardId, newColumn);
+  return newColumn;
 });
 
-// Редактирование названия колонки (сразу сохраняем)
 export const updateColumnTitleAsync = createAsyncThunk<
-  Column, // возвращаем обновлённую колонку
-  { userId: string; columnId: string; newTitle: string },
-  { state: RootState; rejectValue: string }
->('columns/updateColumnTitleAsync', async ({ userId, columnId, newTitle }, { getState, rejectWithValue }) => {
-  try {
-    const currentColumns = getState().columns.columns;
-    const updatedColumns = currentColumns.map(col =>
-      col.id === columnId ? { ...col, title: newTitle.trim() } : col
-    );
-    await saveUserColumns(userId, updatedColumns);
-    return { id: columnId, title: newTitle.trim() };
-  } catch (error) {
-    return rejectWithValue('Ошибка при обновлении названия');
-  }
+  Column,
+  { boardId: string; columnId: string; newTitle: string }
+>('columns/updateColumnTitleAsync', async ({ boardId, columnId, newTitle }) => {
+  await updateColumnTitleInBoard(boardId, columnId, newTitle);
+  return { id: columnId, title: newTitle };
 });
 
-// Удаление колонки с перемещением задач
 export const deleteColumnWithTasks = createAsyncThunk<
   string,
-  { columnId: string; userId: string; targetColumnId?: string },
-  { state: RootState; rejectValue: string }
->('columns/deleteColumnWithTasks', async ({ columnId, userId, targetColumnId = 'Planned' }, { getState, rejectWithValue }) => {
-  try {
-    const state = getState();
-    const tasks = state.tasks.tasks;
-    const tasksToMove = tasks.filter(t => t.status === columnId);
-    await Promise.all(tasksToMove.map(task => 
-      updateTaskStatusInFirestore(task.id, targetColumnId)
-    ));
-    const newColumns = state.columns.columns.filter(col => col.id !== columnId);
-    await saveUserColumns(userId, newColumns);
-    return columnId;
-  } catch (error) {
-    return rejectWithValue('Не удалось удалить колонку');
-  }
+  { boardId: string; columnId: string; targetColumnId?: string },
+  { state: RootState }
+>('columns/deleteColumnWithTasks', async ({ boardId, columnId, targetColumnId = 'Planned' }, { getState }) => {
+  const state = getState();
+  const tasks = state.tasks.tasks;
+  const tasksToMove = tasks.filter(t => t.status === columnId);
+  await Promise.all(tasksToMove.map(task => updateTaskStatusInFirestore(task.id, targetColumnId, boardId)));
+  await deleteColumnFromBoard(boardId, columnId);
+  return columnId;
 });
 
 const columnsSlice = createSlice({
   name: 'columns',
   initialState,
-  reducers: {
-    // Синхронные редьюсеры больше не используем для изменений, оставляем только для очистки
-    resetColumns: () => initialState,
-  },
+  reducers: {},
   extraReducers: (builder) => {
     builder
-      // Загрузка
       .addCase(loadColumns.pending, (state) => {
         state.loading = true;
       })
@@ -106,29 +93,17 @@ const columnsSlice = createSlice({
         state.loading = false;
         state.error = 'Ошибка загрузки колонок';
       })
-      // Добавление
       .addCase(addColumnAsync.fulfilled, (state, action) => {
         state.columns.push(action.payload);
       })
-      .addCase(addColumnAsync.rejected, (_, action) => {
-        console.error(action.payload);
-      })
-      // Редактирование
       .addCase(updateColumnTitleAsync.fulfilled, (state, action) => {
-        const index = state.columns.findIndex(col => col.id === action.payload.id);
-        if (index !== -1) {
-          state.columns[index] = action.payload;
-        }
+        const idx = state.columns.findIndex(c => c.id === action.payload.id);
+        if (idx !== -1) state.columns[idx] = action.payload;
       })
-      .addCase(updateColumnTitleAsync.rejected, (_, action) => {
-        console.error(action.payload);
-      })
-      // Удаление
       .addCase(deleteColumnWithTasks.fulfilled, (state, action) => {
-        state.columns = state.columns.filter(col => col.id !== action.payload);
+        state.columns = state.columns.filter(c => c.id !== action.payload);
       });
   },
 });
 
-export const { resetColumns } = columnsSlice.actions;
 export default columnsSlice.reducer;

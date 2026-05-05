@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Typography, Button, message } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
+import { EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -19,23 +19,43 @@ interface ColumnProps {
   title: string;
   tasks: Task[];
   onTaskClick: (task: Task) => void;
+  searchQuery: string;
+  highlightedTaskId: string | null;
+  onAddTask: () => void;
+  taskRefs: React.MutableRefObject<Map<string, HTMLDivElement>>;
 }
 
-const Column: React.FC<ColumnProps> = ({ id, title, tasks, onTaskClick }) => {
+const Column: React.FC<ColumnProps> = ({
+  id,
+  title,
+  tasks,
+  onTaskClick,
+  searchQuery,
+  highlightedTaskId,
+  onAddTask,
+  taskRefs,
+}) => {
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((s) => s.auth);
+  const { currentBoardId } = useAppSelector((s) => s.boards);
   const { setNodeRef, isOver } = useDroppable({ id });
   const [modalOpen, setModalOpen] = useState(false);
+  const columnRef = useRef<HTMLDivElement>(null);
 
   const handleEdit = async (newTitle: string) => {
-    if (newTitle === title || !user) return;
+    if (newTitle === title || !currentBoardId) return;
     try {
-      await dispatch(updateColumnTitleAsync({ userId: user.uid, columnId: id, newTitle })).unwrap();
+      await dispatch(updateColumnTitleAsync({ boardId: currentBoardId, columnId: id, newTitle })).unwrap();
       message.success('Название обновлено');
     } catch {
       message.error('Ошибка при обновлении названия');
     }
   };
+
+  useEffect(() => {
+    if (highlightedTaskId && tasks.some(t => t.id === highlightedTaskId) && columnRef.current) {
+      columnRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [highlightedTaskId, tasks]);
 
   const columnStyle: React.CSSProperties = {
     background: isOver ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)',
@@ -50,9 +70,13 @@ const Column: React.FC<ColumnProps> = ({ id, title, tasks, onTaskClick }) => {
   };
 
   return (
-    <>
+    <div ref={columnRef} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ textAlign: 'left', color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+        Задач в колонке: {tasks.length}
+      </div>
+
       <div ref={setNodeRef} style={columnStyle}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <Title level={5} style={{ color: 'white', margin: 0, fontSize: '1rem' }}>
             {title}
           </Title>
@@ -66,18 +90,40 @@ const Column: React.FC<ColumnProps> = ({ id, title, tasks, onTaskClick }) => {
         </div>
 
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
             {tasks.map((task) => (
-              <SortableTaskCard key={task.id} task={task} onClick={() => onTaskClick(task)} />
+              <div
+                key={task.id}
+                ref={(el) => {
+                  if (el) taskRefs.current.set(task.id, el);
+                  else taskRefs.current.delete(task.id);
+                }}
+              >
+                <SortableTaskCard
+                  task={task}
+                  onClick={() => onTaskClick(task)}
+                  isHighlighted={highlightedTaskId === task.id}
+                  searchQuery={searchQuery}
+                />
+              </div>
             ))}
           </div>
         </SortableContext>
 
-        <div style={{ marginTop: 'auto', textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-          {tasks.length === 0 && 'Нет задач'}
-          {tasks.length === 1 && '1 задача'}
-          {tasks.length > 1 && `${tasks.length} задач`}
-        </div>
+        <Button
+          type="dashed"
+          icon={<PlusOutlined />}
+          onClick={onAddTask}
+          style={{
+            marginTop: 12,
+            width: '100%',
+            background: 'rgba(255,255,255,0.1)',
+            borderColor: 'rgba(255,255,255,0.3)',
+            color: 'white',
+          }}
+        >
+          Добавить задачу
+        </Button>
       </div>
 
       <ColumnModal
@@ -85,11 +131,11 @@ const Column: React.FC<ColumnProps> = ({ id, title, tasks, onTaskClick }) => {
         mode="edit"
         initialTitle={title}
         columnId={id}
-        userId={user?.uid}
+        boardId={currentBoardId!}
         onClose={() => setModalOpen(false)}
         onConfirm={handleEdit}
       />
-    </>
+    </div>
   );
 };
 

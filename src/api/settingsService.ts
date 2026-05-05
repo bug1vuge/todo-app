@@ -1,49 +1,23 @@
-import { db, storage } from "./firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore"; // убрали updateDoc
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db } from "./firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export interface BackgroundSettings {
   type: "color" | "image";
   value: string;
 }
 
-export interface UserSettings {
-  background: BackgroundSettings;
-}
-
-export const fetchUserSettings = async (userId: string): Promise<UserSettings | null> => {
+export const fetchBoardSettings = async (boardId: string): Promise<{ background?: BackgroundSettings } | null> => {
   try {
-    const docRef = doc(db, "userSettings", userId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return docSnap.data() as UserSettings;
-    } else {
-      return null;
-    }
+    const docRef = doc(db, "boards", boardId, "settings", "preferences");
+    const snap = await getDoc(docRef);
+    return snap.exists() ? snap.data() : null;
   } catch (error) {
-    console.error("Error fetching user settings:", error);
-    throw error;
+    console.error("fetchBoardSettings error:", error);
+    return null;
   }
 };
 
-export const updateBackgroundSettings = async (userId: string, background: BackgroundSettings) => {
-  try {
-    const docRef = doc(db, "userSettings", userId);
-    await setDoc(docRef, { background }, { merge: true });
-  } catch (error) {
-    console.error("Error updating background settings:", error);
-    throw error;
-  }
-};
-
-export const uploadBackgroundImage = async (userId: string, file: File): Promise<string> => {
-  try {
-    const storageRef = ref(storage, `backgrounds/${userId}/${Date.now()}_${file.name}`);
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    return url;
-  } catch (error) {
-    console.error("Error uploading background image:", error);
-    throw error;
-  }
+export const updateBoardBackgroundSettings = async (boardId: string, background: BackgroundSettings): Promise<void> => {
+  const docRef = doc(db, "boards", boardId, "settings", "preferences");
+  await setDoc(docRef, { background }, { merge: true });
 };

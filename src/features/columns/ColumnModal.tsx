@@ -11,7 +11,7 @@ interface ColumnModalProps {
   initialTitle?: string;
   mode: 'create' | 'edit';
   columnId?: string;
-  userId?: string;
+  boardId: string;
   onClose: () => void;
   onConfirm: (title: string) => void;
 }
@@ -21,7 +21,7 @@ const ColumnModal: React.FC<ColumnModalProps> = ({
   initialTitle = '',
   mode,
   columnId,
-  userId,
+  boardId,
   onClose,
   onConfirm,
 }) => {
@@ -45,18 +45,18 @@ const ColumnModal: React.FC<ColumnModalProps> = ({
   };
 
   const handleDelete = () => {
-    if (!columnId || !userId) return;
+    if (!columnId || !boardId) return;
     confirm({
       title: 'Удалить колонку?',
       icon: <ExclamationCircleOutlined />,
       content: 'Все задачи из этой колонки будут перемещены в колонку «Сделать». Отменить нельзя.',
       okText: 'Да',
       cancelText: 'Нет',
-      width: 520, // сделаем шире (было по умолчанию ~416)
-      zIndex: 2000, // поднимем над модалкой редактирования
+      width: 520,
+      zIndex: 2000,
       onOk: async () => {
         try {
-          await dispatch(deleteColumnWithTasks({ columnId, userId })).unwrap();
+          await dispatch(deleteColumnWithTasks({ boardId, columnId })).unwrap();
           message.success('Колонка удалена, задачи перемещены в "Сделать"');
           onClose();
         } catch {

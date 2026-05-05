@@ -4,6 +4,7 @@ import { useAppDispatch } from "./hooks";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./api/firebase";
 import { setUser, clearUser, setLoading } from "./features/auth/authSlice";
+import { ConfigProvider } from 'antd'; // добавили ConfigProvider, Input (для типа), theme
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -28,19 +29,34 @@ const App: React.FC = () => {
   }, [dispatch]);
 
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <ConfigProvider
+      theme={{
+        token: {
+          colorTextPlaceholder: 'rgba(255, 255, 255, 1)', 
+        },
+        components: {
+          Input: {
+            activeBorderColor: 'transparent',
+            hoverBorderColor: 'transparent',
+            activeShadow: 'none',
+          },
+        },
+      }}
+    >
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ConfigProvider>
   );
 };
 

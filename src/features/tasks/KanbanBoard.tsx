@@ -22,6 +22,10 @@ interface KanbanBoardProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onDragEnd: (event: DragEndEvent) => void;
+  searchQuery: string;
+  highlightedTaskId: string | null;
+  onAddTask: (status: string) => void;
+  taskRefs: React.MutableRefObject<Map<string, HTMLDivElement>>;
 }
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -29,9 +33,13 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   tasks,
   onTaskClick,
   onDragEnd,
+  searchQuery,
+  highlightedTaskId,
+  onAddTask,
+  taskRefs,
 }) => {
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((s) => s.auth);
+  const { currentBoardId } = useAppSelector((s) => s.boards);
   const [modalOpen, setModalOpen] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -40,9 +48,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   );
 
   const handleAddColumn = async (title: string) => {
-    if (!user) return;
+    if (!currentBoardId) return;
     try {
-      await dispatch(addColumnAsync({ userId: user.uid, title })).unwrap();
+      await dispatch(addColumnAsync({ boardId: currentBoardId, title })).unwrap();
       message.success('Колонка добавлена');
     } catch {
       message.error('Ошибка при добавлении колонки');
@@ -83,35 +91,52 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   title={col.title}
                   tasks={columnTasks}
                   onTaskClick={onTaskClick}
+                  searchQuery={searchQuery}
+                  highlightedTaskId={highlightedTaskId}
+                  onAddTask={() => onAddTask(col.id)}
+                  taskRefs={taskRefs}
                 />
               </div>
             );
           })}
+          {/* Блок создания колонки с текстом */}
           <div
             style={{
               flex: '0 0 calc(25% - 12px)',
-              background: 'rgba(255,255,255,0.05)',
-              borderRadius: 12,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              border: '1px dashed rgba(255,255,255,0.3)',
-              alignSelf: 'flex-start',
-              minHeight: '200px',
-            }}
-            onClick={() => setModalOpen(true)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-              e.currentTarget.style.border = '1px dashed rgba(255,255,255,0.6)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-              e.currentTarget.style.border = '1px dashed rgba(255,255,255,0.3)';
+              flexDirection: 'column',
+              gap: 12,
             }}
           >
-            <PlusOutlined style={{ fontSize: 28, color: 'rgba(255,255,255,0.7)' }} />
+            <div style={{ textAlign: 'left', color: 'rgba(255,255,255,0.7)', fontSize: 12, opacity: 0 }}>
+              Создать колонку
+            </div>
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: 12,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                border: '1px dashed rgba(255,255,255,0.3)',
+                alignSelf: 'flex-start',
+                minHeight: '200px',
+                width: '100%',
+              }}
+              onClick={() => setModalOpen(true)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                e.currentTarget.style.border = '1px dashed rgba(255,255,255,0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                e.currentTarget.style.border = '1px dashed rgba(255,255,255,0.3)';
+              }}
+            >
+              <PlusOutlined style={{ fontSize: 28, color: 'rgba(255,255,255,0.7)' }} />
+            </div>
           </div>
         </div>
       </DndContext>
@@ -119,6 +144,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       <ColumnModal
         open={modalOpen}
         mode="create"
+        boardId={currentBoardId!}
         onClose={() => setModalOpen(false)}
         onConfirm={handleAddColumn}
       />

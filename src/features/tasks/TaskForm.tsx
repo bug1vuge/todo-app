@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Form, Input, Button, Radio, Space, message } from "antd";
 import { useAppDispatch } from "../../hooks";
 import { addTask, updateTask, deleteTask } from "./tasksSlice";
+import type { Task } from "./tasksSlice";
 
 const priorityOptions = [
   { value: "Low", color: "green", label: "Не горит" },
@@ -13,14 +14,18 @@ interface TaskFormProps {
   open: boolean;
   onClose: () => void;
   userId: string;
-  editingTask?: any | null;
+  boardId: string;
+  editingTask?: Task | null;
+  defaultStatus?: string;
 }
 
 const TaskForm: React.FC<TaskFormProps> = ({
   open,
   onClose,
   userId,
+  boardId,
   editingTask,
+  defaultStatus,
 }) => {
   const [form] = Form.useForm();
   const dispatch = useAppDispatch();
@@ -42,29 +47,25 @@ const TaskForm: React.FC<TaskFormProps> = ({
   const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
-      // Гарантируем, что description не undefined
       const taskData = {
+        userId,
         title: values.title,
         description: values.description || "",
         priority: values.priority,
+        status: editingTask ? editingTask.status : (defaultStatus || "Planned"),
       };
 
       if (editingTask) {
         await dispatch(
           updateTask({
             id: editingTask.id,
+            boardId,
             ...taskData,
           })
         ).unwrap();
         message.success("Задача обновлена");
       } else {
-        await dispatch(
-          addTask({
-            userId,
-            ...taskData,
-            status: "Planned",
-          })
-        ).unwrap();
+        await dispatch(addTask({ boardId, ...taskData })).unwrap();
         message.success("Задача создана");
       }
       onClose();
@@ -80,7 +81,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
     if (!editingTask) return;
     setLoading(true);
     try {
-      await dispatch(deleteTask(editingTask.id)).unwrap();
+      await dispatch(deleteTask({ id: editingTask.id, boardId })).unwrap();
       message.success("Задача удалена");
       onClose();
     } catch (error) {
@@ -97,21 +98,15 @@ const TaskForm: React.FC<TaskFormProps> = ({
       open={open}
       onCancel={onClose}
       footer={null}
-      destroyOnHidden
+      destroyOnClose
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit}>
-        <Form.Item
-          name="title"
-          label="Название"
-          rules={[{ required: true, message: "Введите название" }]}
-        >
+        <Form.Item name="title" label="Название" rules={[{ required: true, message: "Введите название" }]}>
           <Input placeholder="Название задачи" />
         </Form.Item>
-
         <Form.Item name="description" label="Описание">
           <Input.TextArea rows={3} placeholder="Описание (необязательно)" />
         </Form.Item>
-
         <Form.Item name="priority" label="Приоритет">
           <Radio.Group>
             <Space direction="horizontal">
@@ -123,16 +118,13 @@ const TaskForm: React.FC<TaskFormProps> = ({
             </Space>
           </Radio.Group>
         </Form.Item>
-
         <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
           {editingTask && (
             <Button danger onClick={handleDelete} loading={loading} style={{ marginRight: 8 }}>
               Удалить
             </Button>
           )}
-          <Button onClick={onClose} style={{ marginRight: 8 }}>
-            Отмена
-          </Button>
+          <Button onClick={onClose} style={{ marginRight: 8 }}>Отмена</Button>
           <Button type="primary" htmlType="submit" loading={loading}>
             {editingTask ? "Сохранить" : "Создать"}
           </Button>

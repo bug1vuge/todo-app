@@ -1,8 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { Spin } from "antd"; // добавляем спиннер
+import { Spin } from "antd";
 import { useAppSelector } from "../hooks";
-import "../App.css";
 
 interface Props {
   children: React.ReactNode;
@@ -13,8 +12,8 @@ const ProtectedRoute: React.FC<Props> = ({ children }) => {
 
   if (!initialized) {
     return (
-      <div className="loading-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fff' }}>
-        <Spin size="large" tip="Загрузка..." />
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0b0b2b' }}>
+        <Spin size="large" />
       </div>
     );
   }
