@@ -53,7 +53,7 @@ const Register: React.FC = () => {
                 Зарегистрироваться
               </Button>
             </Form.Item>
-            <Form.Item style={{ textAlign: "center", marginBottom: 0 }}>
+            <Form.Item style={{ textAlign: "center", marginBottom: 0, color: '#fff' }}>
               Уже есть аккаунт? <Link to="/login">Войти</Link>
             </Form.Item>
           </Form>

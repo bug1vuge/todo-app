@@ -37,7 +37,7 @@ const App: React.FC = () => {
         components: {
           Input: {
             activeBorderColor: 'transparent',
-            hoverBorderColor: 'transparent',
+            hoverBorderColor: '#dfdfdf',
             activeShadow: 'none',
           },
         },

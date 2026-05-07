@@ -58,7 +58,7 @@ const Login: React.FC = () => {
               </Button>
             </Form.Item>
 
-            <Form.Item style={{ textAlign: "center", marginBottom: 0 }}>
+            <Form.Item style={{ textAlign: "center", marginBottom: 0, color: '#fff' }}>
               Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
             </Form.Item>
           </Form>
