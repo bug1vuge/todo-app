@@ -3,7 +3,9 @@ import { Form, Input, Button, Card, message } from "antd";
 import { useNavigate, Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { register } from "../features/auth/authSlice";
-import "./Auth.css"; // используем те же стили
+import { db } from "../api/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import "./Auth.css";
 
 const Register: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -11,14 +13,17 @@ const Register: React.FC = () => {
   const navigate = useNavigate();
 
   const onFinish = async (values: { email: string; password: string }) => {
-    const res = await dispatch(register(values));
-    // @ts-ignore
-    if (res.type === "auth/register/fulfilled") {
+    const result = await dispatch(register(values));
+    if (register.fulfilled.match(result)) {
+      const userData = result.payload; // { uid: string, email?: string }
+      if (userData && userData.uid) {
+        await setDoc(doc(db, "usersMeta", userData.uid), { email: userData.email });
+      }
       message.success("Аккаунт создан");
       navigate("/");
     } else {
-      // @ts-ignore
-      message.error(res.payload ?? "Ошибка регистрации");
+      const errorMsg = (result.payload as string) ?? "Ошибка регистрации";
+      message.error(errorMsg);
     }
   };
 
@@ -31,13 +36,9 @@ const Register: React.FC = () => {
             <p>Зарегистрируйтесь, чтобы начать</p>
           </div>
           <Form layout="vertical" onFinish={onFinish}>
-            <Form.Item
-              name="email"
-              rules={[{ required: true, message: "Введите email" }]}
-            >
+            <Form.Item name="email" rules={[{ required: true, message: "Введите email" }]}>
               <Input placeholder="Email" size="large" />
             </Form.Item>
-
             <Form.Item
               name="password"
               rules={[
@@ -47,19 +48,11 @@ const Register: React.FC = () => {
             >
               <Input.Password placeholder="Пароль" size="large" />
             </Form.Item>
-
             <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={status === "loading"}
-                block
-                size="large"
-              >
+              <Button type="primary" htmlType="submit" loading={status === "loading"} block size="large">
                 Зарегистрироваться
               </Button>
             </Form.Item>
-
             <Form.Item style={{ textAlign: "center", marginBottom: 0 }}>
               Уже есть аккаунт? <Link to="/login">Войти</Link>
             </Form.Item>

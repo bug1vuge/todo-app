@@ -1,17 +1,21 @@
 import { db } from "./firebase";
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, arrayUnion, query, where } from "firebase/firestore";
 
 export interface Board {
   id: string;
+  ownerId: string;
   name: string;
   createdAt: number;
+  members: string[]; // массив uid участников
 }
 
 export const fetchUserBoards = async (userId: string): Promise<Board[]> => {
   try {
-    const boardsRef = collection(db, "users", userId, "boards");
-    const snapshot = await getDocs(boardsRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Board));
+    const q1 = query(collection(db, "boards"), where("ownerId", "==", userId));
+    const q2 = query(collection(db, "boards"), where("members", "array-contains", userId));
+    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    const boards = [...snap1.docs, ...snap2.docs].map(doc => ({ id: doc.id, ...doc.data() } as Board));
+    return boards.filter((board, index, self) => self.findIndex(b => b.id === board.id) === index);
   } catch (error) {
     console.error("Ошибка загрузки досок:", error);
     return [];
@@ -19,36 +23,47 @@ export const fetchUserBoards = async (userId: string): Promise<Board[]> => {
 };
 
 export const createBoard = async (userId: string, name: string): Promise<Board> => {
-  const boardsRef = collection(db, "users", userId, "boards");
-  const newBoardRef = await addDoc(boardsRef, {
+  const boardsRef = collection(db, "boards");
+  const newBoard = {
+    ownerId: userId,
     name,
     createdAt: Date.now(),
-  });
-  return { id: newBoardRef.id, name, createdAt: Date.now() };
+    members: [],
+  };
+  const docRef = await addDoc(boardsRef, newBoard);
+  return { id: docRef.id, ...newBoard } as Board;
 };
 
-export const updateBoardNameInFirestore = async (userId: string, boardId: string, newName: string): Promise<void> => {
-  const boardDocRef = doc(db, "users", userId, "boards", boardId);
-  await updateDoc(boardDocRef, { name: newName });
+export const updateBoardNameInFirestore = async (boardId: string, newName: string): Promise<void> => {
+  const boardRef = doc(db, "boards", boardId);
+  await updateDoc(boardRef, { name: newName });
 };
 
-export const deleteBoardWithAllData = async (userId: string, boardId: string): Promise<void> => {
-  // 1. Удаляем все задачи
+export const deleteBoardWithAllData = async (boardId: string): Promise<void> => {
   const tasksRef = collection(db, "boards", boardId, "tasks");
   const tasksSnapshot = await getDocs(tasksRef);
-  await Promise.all(tasksSnapshot.docs.map(taskDoc => deleteDoc(taskDoc.ref)));
+  await Promise.all(tasksSnapshot.docs.map(doc => deleteDoc(doc.ref)));
 
-  // 2. Удаляем метаданные (колонки)
   const metadataRef = collection(db, "boards", boardId, "metadata");
   const metadataSnapshot = await getDocs(metadataRef);
-  await Promise.all(metadataSnapshot.docs.map(metaDoc => deleteDoc(metaDoc.ref)));
+  await Promise.all(metadataSnapshot.docs.map(doc => deleteDoc(doc.ref)));
 
-  // 3. Удаляем настройки
   const settingsRef = collection(db, "boards", boardId, "settings");
   const settingsSnapshot = await getDocs(settingsRef);
-  await Promise.all(settingsSnapshot.docs.map(settingDoc => deleteDoc(settingDoc.ref)));
+  await Promise.all(settingsSnapshot.docs.map(doc => deleteDoc(doc.ref)));
 
-  // 4. Удаляем ссылку на доску у пользователя
-  const boardDocRef = doc(db, "users", userId, "boards", boardId);
-  await deleteDoc(boardDocRef);
+  const boardRef = doc(db, "boards", boardId);
+  await deleteDoc(boardRef);
+};
+
+export const addMemberToBoardService = async (boardId: string, email: string): Promise<void> => {
+  const usersMetaRef = collection(db, "usersMeta");
+  const q = query(usersMetaRef, where("email", "==", email));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) throw new Error("Пользователь не найден");
+  const userUid = snapshot.docs[0].id;
+  const boardRef = doc(db, "boards", boardId);
+  await updateDoc(boardRef, {
+    members: arrayUnion(userUid),
+  });
 };

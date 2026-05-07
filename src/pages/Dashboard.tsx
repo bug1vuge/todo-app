@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Layout, Input, message, Button, Modal as AntModal, Spin, Dropdown } from 'antd';
-import { UserOutlined, DownOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EditOutlined, ExclamationCircleOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { fetchTasks, moveTask } from '../features/tasks/tasksSlice';
 import { fetchSettings } from '../features/settings/settingsSlice';
@@ -9,8 +9,10 @@ import { loadBoards, addBoard, setCurrentBoard, deleteBoard, updateBoardName } f
 import KanbanBoard from '../features/tasks/KanbanBoard';
 import TaskForm from '../features/tasks/TaskForm';
 import UserProfileDrawer from '../features/auth/UserProfileDrawer';
+import AddMemberModal from '../features/boards/AddMemberModal';
 import { type DragEndEvent } from '@dnd-kit/core';
 import type { Task } from '../features/tasks/tasksSlice';
+import { MenuOutlined } from '@ant-design/icons';
 import './Dashboard.css';
 import '../App.css';
 
@@ -39,9 +41,9 @@ const Dashboard: React.FC = () => {
   const [editBoardName, setEditBoardName] = useState('');
   const taskRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [hasCreatedDefault, setHasCreatedDefault] = useState(false);
-  const hasRestored = useRef(false); // Флаг для восстановления доски
+  const hasRestored = useRef(false);
+  const [addMemberModalVisible, setAddMemberModalVisible] = useState(false);
 
-  // Сохраняем текущую доску в localStorage при её изменении
   useEffect(() => {
     if (currentBoardId) {
       localStorage.setItem('lastBoardId', currentBoardId);
@@ -52,7 +54,6 @@ const Dashboard: React.FC = () => {
     if (initialized && user) dispatch(loadBoards(user.uid));
   }, [dispatch, user, initialized]);
 
-  // Создание доски по умолчанию (только если нет досок и загрузка завершена)
   useEffect(() => {
     if (initialized && user && !boardsLoading && boards.length === 0 && !hasCreatedDefault) {
       setHasCreatedDefault(true);
@@ -60,14 +61,12 @@ const Dashboard: React.FC = () => {
     }
   }, [initialized, user, boardsLoading, boards.length, hasCreatedDefault, dispatch]);
 
-  // Восстанавливаем последнюю выбранную доску после загрузки списка
   useEffect(() => {
     if (!boardsLoading && boards.length > 0 && !hasRestored.current) {
       const lastBoardId = localStorage.getItem('lastBoardId');
       if (lastBoardId && boards.some(b => b.id === lastBoardId)) {
         dispatch(setCurrentBoard(lastBoardId));
       } else if (!currentBoardId) {
-        // если нет сохранённой, но currentBoardId ещё не задан, берём первую
         dispatch(setCurrentBoard(boards[0].id));
       }
       hasRestored.current = true;
@@ -82,7 +81,6 @@ const Dashboard: React.FC = () => {
     }
   }, [dispatch, currentBoardId]);
 
-  // Debounce поиска
   useEffect(() => {
     const handler = setTimeout(() => {
       if (searchQuery.length >= 3 || searchQuery.length === 0) setDebouncedQuery(searchQuery);
@@ -91,7 +89,6 @@ const Dashboard: React.FC = () => {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  // Поиск и подсветка
   useEffect(() => {
     if (!debouncedQuery.trim()) {
       setHighlightedTaskId(null);
@@ -157,9 +154,7 @@ const Dashboard: React.FC = () => {
     dispatch(setCurrentBoard(boardId));
   };
 
-  // Удаление доски через модальное окно подтверждения
   const handleDeleteBoard = (boardId: string) => {
-    if (!user) return;
     confirm({
       title: 'Удалить доску?',
       icon: <ExclamationCircleOutlined />,
@@ -170,7 +165,7 @@ const Dashboard: React.FC = () => {
       zIndex: 2000,
       onOk: async () => {
         try {
-          await dispatch(deleteBoard({ userId: user.uid, boardId })).unwrap();
+          await dispatch(deleteBoard(boardId)).unwrap();
           message.success('Доска удалена');
         } catch {
           message.error('Ошибка удаления доски');
@@ -186,14 +181,14 @@ const Dashboard: React.FC = () => {
   };
 
   const handleUpdateBoardName = async () => {
-    if (!user || !editBoardId) return;
+    if (!editBoardId) return;
     const trimmed = editBoardName.trim();
     if (!trimmed) {
       message.error('Название не может быть пустым');
       return;
     }
     try {
-      await dispatch(updateBoardName({ userId: user.uid, boardId: editBoardId, newName: trimmed })).unwrap();
+      await dispatch(updateBoardName({ boardId: editBoardId, newName: trimmed })).unwrap();
       message.success('Название обновлено');
       setEditBoardModalVisible(false);
       setEditBoardId(null);
@@ -276,7 +271,7 @@ const Dashboard: React.FC = () => {
   return (
     <div className="dashboard-container" style={containerStyle}>
       <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
-        <Header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)', padding: '0 54px', height: 74 }}>
+        <Header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(8px)', padding: '0 34px', height: 74 }}>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: 200 }}>
             <svg style={{ width: '100%', height: '100%' }} width="231" height="44" viewBox="0 0 231 44" fill="none" xmlns="http://www.w3.org/2000/svg">
               <g clipPath="url(#clip0_2001_1579)">
@@ -290,21 +285,32 @@ const Dashboard: React.FC = () => {
                 </clipPath>
               </defs>
             </svg>
+
           </div>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <Input placeholder="Введите название задачи" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ height: 40, width: 400, background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', outline: 'none', boxShadow: 'none' }} />
           </div>
           <div style={{ marginLeft: 50 }}>
-            <button onClick={() => setOpenProfileDrawer(true)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: 20 }}><UserOutlined /></button>
+            <button onClick={() => setOpenProfileDrawer(true)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: 20 }}>
+              <MenuOutlined />
+            </button>
           </div>
         </Header>
 
-        <div style={{ padding: '16px 34px 0 34px', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '16px 34px 0 34px', marginBottom: 8 }}>
           <Dropdown dropdownRender={() => boardMenu} trigger={['click']}>
             <Button style={{ background: 'transparent', border: 'none', color: 'white', padding: 0, fontSize: '1rem' }}>
-              Текущая доска - {currentBoardName} <DownOutlined />
+              <span style={{ borderBottom: '1px dashed transparent' }}>Выбранная доска -</span><span style={{ borderBottom: '1px dashed rgba(255,255,255,0.6)' }}>{currentBoardName}</span>
             </Button>
           </Dropdown>
+          {currentBoardId && (
+            <Button
+              type="text"
+              icon={<UserAddOutlined style={{ fontSize: '20px' }} />}
+              onClick={() => setAddMemberModalVisible(true)}
+              style={{ color: 'white' }}
+            />
+          )}
         </div>
 
         <Content style={{ padding: '34px 34px', height: '100%' }}>
@@ -320,6 +326,11 @@ const Dashboard: React.FC = () => {
       <AntModal title="Редактировать доску" open={editBoardModalVisible} onOk={handleUpdateBoardName} onCancel={() => setEditBoardModalVisible(false)} okText="Сохранить" cancelText="Отмена">
         <Input placeholder="Название доски" value={editBoardName} onChange={(e) => setEditBoardName(e.target.value)} onPressEnter={handleUpdateBoardName} />
       </AntModal>
+      <AddMemberModal
+        open={addMemberModalVisible}
+        onClose={() => setAddMemberModalVisible(false)}
+        boardId={currentBoardId!}
+      />
     </div>
   );
 };

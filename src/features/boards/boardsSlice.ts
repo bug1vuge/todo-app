@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { fetchUserBoards, createBoard, deleteBoardWithAllData, updateBoardNameInFirestore, type Board } from "../../api/boardsService";
+import { fetchUserBoards, createBoard, deleteBoardWithAllData, updateBoardNameInFirestore, addMemberToBoardService, type Board } from "../../api/boardsService";
 
 interface BoardsState {
   list: Board[];
@@ -12,7 +12,7 @@ interface BoardsState {
 const initialState: BoardsState = {
   list: [],
   currentBoardId: null,
-  loading: true,          // ← было false, исправлено на true
+  loading: true,
   error: null,
 };
 
@@ -32,17 +32,25 @@ export const addBoard = createAsyncThunk(
 
 export const updateBoardName = createAsyncThunk(
   "boards/updateName",
-  async ({ userId, boardId, newName }: { userId: string; boardId: string; newName: string }) => {
-    await updateBoardNameInFirestore(userId, boardId, newName);
+  async ({ boardId, newName }: { boardId: string; newName: string }) => {
+    await updateBoardNameInFirestore(boardId, newName);
     return { boardId, newName };
   }
 );
 
 export const deleteBoard = createAsyncThunk(
   "boards/delete",
-  async ({ userId, boardId }: { userId: string; boardId: string }) => {
-    await deleteBoardWithAllData(userId, boardId);
+  async (boardId: string) => {
+    await deleteBoardWithAllData(boardId);
     return boardId;
+  }
+);
+
+export const addMemberToBoard = createAsyncThunk(
+  "boards/addMember",
+  async ({ boardId, email }: { boardId: string; email: string }) => {
+    await addMemberToBoardService(boardId, email);
+    return { boardId, email };
   }
 );
 
@@ -70,7 +78,7 @@ const boardsSlice = createSlice({
       .addCase(addBoard.fulfilled, (state, action) => {
         state.list.push(action.payload);
         state.currentBoardId = action.payload.id;
-        state.loading = false; // добавим на всякий случай
+        state.loading = false;
       })
       .addCase(updateBoardName.fulfilled, (state, action) => {
         const { boardId, newName } = action.payload;
@@ -82,6 +90,9 @@ const boardsSlice = createSlice({
         if (state.currentBoardId === action.payload) {
           state.currentBoardId = state.list.length > 0 ? state.list[0].id : null;
         }
+      })
+      .addCase(addMemberToBoard.fulfilled, () => {
+        // можно перезагрузить доски или просто показать сообщение (уже показано в компоненте)
       });
   },
 });
